@@ -2,9 +2,15 @@
 
 Welcome! Click the badge below to launch our **4-pane RStudio IDE** directly in your web browser—no installation or login required:
 
-<a href="https://mybinder.org/v2/gh/jjac32/ban3083-r-lab/HEAD?urlpath=rstudio" target="_blank">
-  <img src="https://mybinder.org/badge_logo.svg" alt="Launch RStudio in Binder" />
-</a>
+<p style="margin: 20px 0;">
+  <a class="btn btn-primary btn-large"
+     style="background-color: #2b5c8f; color: #ffffff; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 6px; text-decoration: none; display: inline-block;"
+     href="https://mybinder.org/v2/gh/jjac32/ban3083-r-lab/HEAD?urlpath=rstudio"
+     target="_blank"
+     rel="noopener noreferrer">
+    🚀 Launch BAN 3083 RStudio Workspace (Opens in New Tab)
+  </a>
+</p>
 
 ### Instructions 
 1. Click the **Launch Binder** badge above (it takes ~20–40 seconds to open RStudio).
