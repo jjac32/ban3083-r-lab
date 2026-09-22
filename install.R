@@ -34,3 +34,6 @@ install.packages(c(
   "broom",           # Tidy output for lm() regressions and t.test()
   "infer"            # Tidy confidence intervals & hypothesis testing
 ))
+
+# Ensure rsconnect is always >= 1.3.1 from live CRAN for RStudio's RPubs button
+install.packages("rsconnect", repos = "https://cloud.r-project.org")
