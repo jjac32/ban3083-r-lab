@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+mkdir -p data
+curl -L -s "https://github.com/lerocha/chinook-database/releases/download/v1.4.5/Chinook_Sqlite.sqlite" -o data/chinook.sqlite
