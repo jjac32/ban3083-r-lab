@@ -251,16 +251,30 @@ ggplot(shipments, aes(x = boxes_shipped, y = freight_cost_usd, color = carrier, 
 
 ## 🌐 How to Publish to RPubs & Submit Your URL on Canvas
 
-1. At the top of this file (Line 3), replace `[Type Your Name Here]` with your name.
-2. Click the **🧶 Knit** button at the top of this pane.
-3. In the top-right corner of the preview window, click the blue **Publish** button $\rightarrow$ **RPubs**.
-4. Copy your `https://rpubs.com/...` URL and submit it on **Canvas**!
+Follow these steps to publish your finished lab report to **[RPubs.com](https://rpubs.com/)** and get your submission link for Canvas:
 
-```{r rpubs-backup, eval=FALSE}
-# Backup if your browser blocks the Publish popup window:
-rsconnect::rpubsUpload(
+1. **Add Your Name**: At the very top of this file (Line 3), replace `[Type Your Name Here]` with your actual name and save (`Ctrl+S` / `Cmd+S`).
+2. **Click the Green `▶` Play Button on the Code Chunk Below**:
+   - It will automatically knit your report to HTML, upload it to **RPubs.com**, and print a **`http://rpubs.com/publish/claim/...`** link right below the box!
+3. **Click That Link**:
+   - It will open **RPubs.com** in a new tab (sign in or create a free account if this is your first lab, then click **Continue**).
+   - Copy your final `https://rpubs.com/your_username/...` URL from your browser's address bar and paste it into **Canvas**!
+
+```{r publish-to-rpubs, eval=FALSE}
+# 👉 CLICK THE GREEN '▶' PLAY BUTTON ON THE RIGHT OF THIS BOX TO PUBLISH!
+
+# Step 1: Automatically knit your latest work into an HTML report
+rmarkdown::render("Week02_Reading_Raw_Data.Rmd", quiet = TRUE)
+
+# Step 2: Upload the HTML report directly to RPubs.com
+upload_result <- rsconnect::rpubsUpload(
   title = "BAN 3083: Week 2 Reading Raw Data",
   contentFile = "Week02_Reading_Raw_Data.html",
   originalDoc = "Week02_Reading_Raw_Data.Rmd"
-)$continueUrl
+)
+
+cat("\n============================================================\n")
+cat("🚀 SUCCESS! CLICK THE LINK BELOW TO CLAIM YOUR RPUBS PAGE:\n")
+cat(upload_result$continueUrl, "\n")
+cat("============================================================\n")
 ```
