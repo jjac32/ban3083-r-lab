@@ -1,0 +1,235 @@
+---
+title: "BAN 3083 - Week 3: Restructuring & Combining Data Files"
+author: "Student Name: [Type Your Name Here]"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+if (!dir.exists("data")) dir.create("data")
+if (!file.exists("data/chinook.sqlite")) {
+  download.file(
+    url = "https://github.com/lerocha/chinook-database/releases/download/v1.4.5/Chinook_Sqlite.sqlite",
+    destfile = "data/chinook.sqlite",
+    mode = "wb"
+  )
+}
+```
+
+## Overview: Restructuring & Combining Data in Business Analytics
+
+In corporate analytics (**BAN 3083**), data is almost never stored in a single table shaped the way your chart or statistical model requires. You must master two core operations:
+
+1. **Restructuring (Reshaping) Data (`tidyr`)**:
+   - **`pivot_longer()`** *(SAS `PROC TRANSPOSE` Wide-to-Long)*: Turns column headers (like `Q1`, `Q2`, `Q3`, `Q4`) into rows so you can plot time series in `ggplot2` and run regression models.
+   - **`pivot_wider()`** *(SAS `PROC TRANSPOSE` Long-to-Wide)*: Turns rows into cross-tabulated columns for executive presentation tables.
+2. **Combining Data Files (`dplyr`)**:
+   - **Stacking rows (`bind_rows`)**: Appending monthly or regional extracts with identical columns (SQL `UNION ALL` / SAS `SET`).
+   - **Relational Joins (`left_join`, `inner_join`, `anti_join`)**: Merging tables side-by-side using a primary/foreign key (SQL `JOIN` / SAS `MERGE BY`).
+
+---
+
+## Part 1: Restructuring Wide Spreadsheets into Tidy Long Data (`pivot_longer`)
+
+Accounting and Finance teams love "Wide" spreadsheets where each quarter or year is a separate column. Let's look at a quarterly revenue spreadsheet for Chinook's 4 global divisions:
+
+```{r create-wide-finance}
+library(tidyverse)
+library(DBI)
+library(RSQLite)
+library(gt)
+library(scales)
+library(patchwork)
+
+wide_finance <- tibble(
+  Division = c("North America", "Europe", "Latin America", "Asia Pacific"),
+  Q1_2025  = c(125000, 98000, 64000, 110000),
+  Q2_2025  = c(138000, 105000, 71000, 129000),
+  Q3_2025  = c(149000, 118000, 68000, 145000),
+  Q4_2025  = c(182000, 142000, 89000, 176000)
+)
+
+# Display the wide accounting table
+wide_finance |>
+  gt() |>
+  tab_header(title = "Wide Format: Finance Department Spreadsheet") |>
+  fmt_currency(columns = starts_with("Q"), currency = "USD", decimals = 0)
+```
+
+### Why Wide Data Fails for Plotting
+Try plotting `Quarter` on the x-axis and `Revenue` on the y-axis from `wide_finance`—you can't, because there is no `Quarter` column or `Revenue` column!
+
+Let's use **`pivot_longer()`** to restructure the 4 quarter columns into two tidy columns: `Quarter` and `Revenue`:
+
+```{r pivot-longer-demo}
+long_finance <- wide_finance |>
+  pivot_longer(
+    cols = starts_with("Q"),
+    names_to = "Quarter",
+    values_to = "Revenue"
+  )
+
+long_finance
+```
+
+### Plotting the Restructured Data (`ggplot2`)
+Now that our data is in **Tidy (Long) Format**, we can plot a multi-division quarterly growth chart in seconds:
+
+```{r plot-long-finance}
+ggplot(long_finance, aes(x = Quarter, y = Revenue, color = Division, group = Division)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  scale_y_continuous(labels = label_dollar()) +
+  labs(
+    title = "Quarterly Revenue Trajectory by Division (2025)",
+    subtitle = "Restructured from Wide Spreadsheet to Long Tidy Format via pivot_longer()",
+    x = "Fiscal Quarter",
+    y = "Revenue (USD)",
+    color = "Division"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## Part 2: Stacking Separate Regional Data Files (`bind_rows`)
+
+Suppose two regional offices send separate monthly invoice extracts. When two tables have the **exact same columns**, we stack them vertically using `bind_rows()` (with `.id = "Source_Batch"` to track which file each row came from):
+
+```{r bind-rows-demo}
+north_extract <- tibble(
+  Invoice_ID = c(9001, 9002),
+  Customer   = c("Acme Corp", "Beta LLC"),
+  Amount     = c(450.00, 820.50)
+)
+
+south_extract <- tibble(
+  Invoice_ID = c(9003, 9004),
+  Customer   = c("Delta Inc", "Omega Co"),
+  Amount     = c(310.00, 1190.00)
+)
+
+combined_extracts <- bind_rows(
+  "North_Office" = north_extract,
+  "South_Office" = south_extract,
+  .id = "Regional_File"
+)
+
+combined_extracts
+```
+
+---
+
+## Part 3: Combining Relational Tables & Restructuring to Wide (`left_join` + `pivot_wider`)
+
+Now let's connect to the **Chinook database** and pull three separate tables into R (`Customer`, `Invoice`, and `Employee`) so we can combine them using `dplyr` relational joins!
+
+```{r load-chinook-tables}
+con <- dbConnect(RSQLite::SQLite(), "data/chinook.sqlite")
+
+customers <- dbReadTable(con, "Customer") |> as_tibble()
+invoices  <- dbReadTable(con, "Invoice")  |> as_tibble()
+employees <- dbReadTable(con, "Employee") |> as_tibble()
+
+dbDisconnect(con)
+```
+
+### 1. Combining `Customer`, `Invoice`, and `Employee` (`inner_join` & `left_join`)
+Each customer is assigned to a `SupportRepId` (which matches `EmployeeId` in the `Employee` table), and each invoice belongs to a `CustomerId`. Let's combine all three tables to see how much revenue each Sales Support Representative generated by customer region:
+
+```{r join-three-tables}
+rep_performance <- invoices |>
+  inner_join(customers, by = "CustomerId") |>
+  left_join(employees, by = c("SupportRepId" = "EmployeeId")) |>
+  mutate(
+    Rep_Name = paste(FirstName.y, LastName.y),
+    Market = case_when(
+      BillingCountry %in% c("USA", "Canada") ~ "North America",
+      BillingCountry %in% c("Brazil", "Argentina", "Chile") ~ "Latin America",
+      TRUE ~ "Europe & Rest of World"
+    )
+  ) |>
+  group_by(Rep_Name, Market) |>
+  summarize(Total_Sales = sum(Total, na.rm = TRUE), .groups = "drop")
+
+rep_performance
+```
+
+### 2. Restructuring Long Summary Back to a Wide Executive Cross-Tab (`pivot_wider`)
+While `ggplot2` loves long data, human executives love reading wide cross-tabulations! Let's use **`pivot_wider()`** to give each Market its own column and display it with `gt()`:
+
+```{r pivot-wider-table}
+rep_performance |>
+  pivot_wider(
+    names_from = Market,
+    values_from = Total_Sales,
+    values_fill = 0
+  ) |>
+  mutate(Grand_Total = `North America` + `Latin America` + `Europe & Rest of World`) |>
+  arrange(desc(Grand_Total)) |>
+  gt() |>
+  tab_header(
+    title = "Sales Support Rep Revenue by Global Market",
+    subtitle = "Combined via inner_join() + left_join(), Restructured via pivot_wider()"
+  ) |>
+  fmt_currency(columns = where(is.numeric), currency = "USD")
+```
+
+### 3. Visualizing the Combined Data (`ggplot2`)
+Let's plot our `rep_performance` dataset as a grouped horizontal bar chart:
+
+```{r plot-rep-market}
+ggplot(rep_performance, aes(x = reorder(Rep_Name, Total_Sales, sum), y = Total_Sales, fill = Market)) +
+  geom_col(position = "stack", width = 0.7) +
+  coord_flip() +
+  scale_y_continuous(labels = label_dollar()) +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(
+    title = "Total Chinook Revenue by Support Representative & Market",
+    x = "Support Representative",
+    y = "Cumulative Invoice Sales (USD)",
+    fill = "Customer Market"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## Part 4: Data Auditing with Filtering Joins (`anti_join`)
+
+One of the most useful tools in **BAN 3083** is `anti_join(x, y)`: it returns all rows in table `x` that have **NO match** in table `y`. 
+
+Which Chinook employees are **not** assigned as Support Reps for any customer?
+
+```{r anti-join-audit}
+employees |>
+  anti_join(customers, by = c("EmployeeId" = "SupportRepId")) |>
+  select(EmployeeId, FirstName, LastName, Title, Department = Title) |>
+  gt() |>
+  tab_header(
+    title = "Employees With Zero Assigned Customers",
+    subtitle = "Identified via anti_join(employees, customers)"
+  )
+```
+
+---
+
+## 🌐 How to Publish to RPubs & Submit Your URL on Canvas
+
+1. At the top of this file (Line 3), replace `[Type Your Name Here]` with your name.
+2. Click **🧶 Knit**, then click the blue **Publish** button $\rightarrow$ **RPubs**.
+3. Submit your `https://rpubs.com/...` URL on **Canvas**!
+
+```{r rpubs-backup, eval=FALSE}
+rsconnect::rpubsUpload(
+  title = "BAN 3083: Week 3 Restructuring & Combining Data",
+  contentFile = "Week03_Restructuring_and_Combining.html",
+  originalDoc = "Week03_Restructuring_and_Combining.Rmd"
+)$continueUrl
+```
