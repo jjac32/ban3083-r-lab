@@ -12,6 +12,8 @@ Welcome! Click the badge below to launch our **4-pane RStudio IDE** directly in 
   </a>
 </p>
 
+*(Tip: On GitHub, **Ctrl+Click** / **Cmd+Click** or **Right-Click -> Open in New Tab** to keep this page open)*
+
 ### Instructions 
 1. Click the **Launch Binder** badge above (it takes ~20–40 seconds to open RStudio).
 2. The `.Rmd` will open automatically in the top-left pane.
