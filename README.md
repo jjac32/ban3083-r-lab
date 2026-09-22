@@ -8,7 +8,7 @@ Welcome! Click the badge below to launch our **4-pane RStudio IDE** directly in 
      href="https://mybinder.org/v2/gh/jjac32/ban3083-r-lab/HEAD?urlpath=rstudio"
      target="_blank"
      rel="noopener noreferrer">
-    🚀 Launch BAN 3083 RStudio Workspace (Opens in New Tab)
+    🚀 Launch BAN 3083 RStudio Workspace 
   </a>
 </p>
 
