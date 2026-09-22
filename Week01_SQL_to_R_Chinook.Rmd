@@ -8,8 +8,10 @@ output:
     toc_float: true
     theme: flatly
 ---
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
 # Safety check: if running outside Binder without chinook.sqlite, download it automatically
 if (!dir.exists("data")) dir.create("data")
 if (!file.exists("data/chinook.sqlite")) {
@@ -20,34 +22,51 @@ if (!file.exists("data/chinook.sqlite")) {
   )
 }
 ```
+
 ## Welcome to RStudio! (Meet the 4 Panes)
+
 Take a quick look around your browser window—you are looking at the **4-pane RStudio IDE**:
+
 1. **Top-Left (Source Editor — *where you are reading this!*)**: Your notebook and scripts. Click the green **▶ (Run Current Chunk)** button on the top-right of any gray code box below to run code.
 2. **Bottom-Left (Console)**: Where R executes commands behind the scenes.
 3. **Top-Right (Environment)**: Shows all the datasets and variables currently loaded in memory.
 4. **Bottom-Right (Files / Plots / Help)**: Where your visualizations (`Plots`) and files (`Files`) appear.
+
 ---
+
 ## Part 1: Connecting R to the Chinook SQLite Database
+
 In our SQL module, you queried the **Chinook digital music store database** (`Artist`, `Album`, `Track`, `Genre`, `Customer`, `Invoice`). 
+
 R doesn't replace SQL—in fact, R works *hand-in-hand* with SQL! Let's load our packages and connect to `chinook.sqlite`.
+
 👉 **Click the green `▶` play button on the right side of the gray box below:**
+
 ```{r connect-db}
 library(DBI)
 library(RSQLite)
 library(tidyverse)
 library(dbplyr)
+
 # Connect to the Chinook SQLite file
 con <- dbConnect(RSQLite::SQLite(), "data/chinook.sqlite")
+
 # List all tables in the database (these should look familiar!)
 dbListTables(con)
 ```
+
 ---
+
 ## Part 2: Writing Pure SQL Directly Inside RMarkdown
+
 Did you know you can write **100% pure SQL** inside an RMarkdown document without learning a single line of R syntax first?
+
 Look at the header of the code chunk below: `{sql connection=con, output.var="genre_summary"}`.
 - `connection=con` tells RStudio to run this SQL query against our Chinook database.
 - `output.var="genre_summary"` tells RStudio to save the resulting table as a new R dataset named `genre_summary`!
+
 👉 **Run the SQL chunk below, then look at your Top-Right (Environment) pane:**
+
 ```{sql connection=con, output.var="genre_summary"}
 SELECT 
     g.Name AS Genre,
@@ -60,5 +79,154 @@ GROUP BY g.Name
 HAVING COUNT(t.TrackId) >= 30
 ORDER BY TrackCount DESC;
 ```
+
 Let's inspect the `genre_summary` table that SQL just handed over to R:
+
 ```{r view-genre-summary}
+genre_summary
+```
+
+---
+
+## Part 3: Running SQL Inside R Code with `dbGetQuery()`
+
+Another common way data scientists run SQL in R is using the `dbGetQuery()` function. You pass it your database connection (`con`) and a SQL query string, and it returns an R data frame.
+
+Let's find the **Top 10 Countries by Total Invoice Sales** in Chinook:
+
+```{r sql-in-r}
+country_sales <- dbGetQuery(con, "
+  SELECT 
+      BillingCountry AS Country,
+      COUNT(InvoiceId) AS NumInvoices,
+      ROUND(SUM(Total), 2) AS TotalRevenue
+  FROM Invoice
+  GROUP BY BillingCountry
+  ORDER BY TotalRevenue DESC
+  LIMIT 10;
+")
+
+country_sales
+```
+
+---
+
+## Part 4: Why Combine SQL and R? Visualization (`ggplot2`)!
+
+SQL is fantastic at joining and aggregating tables—but SQL cannot create graphics. 
+
+Because our SQL query results (`genre_summary` and `country_sales`) are now R data frames, we can pipe them directly into **`ggplot2`**, R's industry-standard visualization library!
+
+👉 **Run the chunk below to visualize the SQL query we just ran:**
+
+```{r plot-genre}
+ggplot(genre_summary, aes(x = reorder(Genre, TrackCount), y = TrackCount, fill = AvgMinutes)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_viridis_c(option = "plasma", name = "Avg Track\nLength (min)") +
+  labs(
+    title = "Chinook Catalog: Most Popular Genres & Track Lengths",
+    subtitle = "Data extracted via SQL JOIN on Track and Genre tables",
+    x = "Genre",
+    y = "Number of Tracks (n >= 30)"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## Part 5: Sneak Peek at Next Week — How `dplyr` Speaks SQL!
+
+Starting next week, we will learn **`dplyr`**, R's grammar of data wrangling. 
+
+Here is a secret that makes learning `dplyr` much easier: **`dplyr` verbs are really just SQL clauses in disguise!**
+
+| What you want to do | SQL Clause | R `dplyr` Verb |
+| :--- | :--- | :--- |
+| Pick columns | `SELECT` | `select()` |
+| Filter rows | `WHERE` / `HAVING` | `filter()` |
+| Create new columns | `SELECT ... AS` | `mutate()` |
+| Group rows | `GROUP BY` | `group_by()` |
+| Aggregate metrics | `COUNT()`, `AVG()`, `SUM()` | `summarize()` |
+| Sort rows | `ORDER BY` | `arrange()` |
+
+In fact, R can connect directly to a SQL table using `tbl(con, "TableName")` and **automatically translate your R code into SQL**!
+
+👉 **Run the chunk below to see R write the SQL query for you using `show_query()`:**
+
+```{r dplyr-to-sql}
+# Connect to the Track and Genre tables lazily
+tracks_db <- tbl(con, "Track")
+genres_db <- tbl(con, "Genre")
+
+# Write R (dplyr) code using the pipe operator |>
+r_pipeline <- tracks_db |>
+  inner_join(genres_db, by = "GenreId") |>
+  group_by(Genre = Name.y) |>
+  summarize(
+    TrackCount = count(),
+    AvgMinutes = mean(Milliseconds, na.rm = TRUE) / 60000.0
+  ) |>
+  filter(TrackCount >= 30) |>
+  arrange(desc(TrackCount))
+
+# Ask R: "What SQL query did you generate behind the scenes?"
+show_query(r_pipeline)
+```
+
+And if we execute `collect(r_pipeline)`, R runs that exact query and brings back the results:
+
+```{r collect-results}
+collect(r_pipeline)
+```
+
+---
+
+## Part 6: Your Turn! (Lab Exercises)
+
+### Exercise 1: Write Your Own SQL Query in R
+Modify the `{sql}` chunk below to find the **Top 10 Artists with the most Albums** in the Chinook database (joining `Artist` and `Album`). The result will automatically be saved to R as `top_artists`.
+
+```{sql connection=con, output.var="top_artists"}
+SELECT 
+    ar.Name AS ArtistName,
+    COUNT(al.AlbumId) AS AlbumCount
+FROM Artist AS ar
+INNER JOIN Album AS al ON ar.ArtistId = al.ArtistId
+GROUP BY ar.ArtistId, ar.Name
+ORDER BY AlbumCount DESC
+LIMIT 10;
+```
+
+### Exercise 2: Visualize Your SQL Output with `ggplot2`
+Run the chunk below to plot your `top_artists` SQL result. Try changing `fill = "steelblue"` to another color (like `"darkorange"`, `"seagreen"`, or `"firebrick"`) and updating the chart `title`!
+
+```{r plot-top-artists}
+ggplot(top_artists, aes(x = reorder(ArtistName, AlbumCount), y = AlbumCount)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Top 10 Artists by Number of Albums in Chinook",
+    x = "Artist",
+    y = "Number of Albums"
+  ) +
+  theme_minimal()
+```
+
+```{r cleanup, include=FALSE}
+# Always good practice to disconnect when knitting finishes
+dbDisconnect(con)
+```
+
+---
+
+## 📥 How to Submit Your Lab (Important!)
+
+Because this browser session runs in the cloud without a login, **your session will reset if you close your tab for too long**. Follow these 3 steps to save and submit your work:
+
+1. At the top of this pane (`Week01_SQL_to_R_Chinook.Rmd`), replace `[Type Your Name Here]` on Line 3 with your actual name.
+2. Click the **🧶 Knit** button at the top of this pane. A complete HTML report with your code, SQL tables, and charts will pop up!
+3. Look at the **Bottom-Right (Files) pane**:
+   - Check the box `[x]` next to **`Week01_SQL_to_R_Chinook.html`**.
+   - Click **More ⚙️** (in the Files pane toolbar) $\rightarrow$ **Export...** $\rightarrow$ **Download**.
+   - Upload that `.html` file to our class page!
