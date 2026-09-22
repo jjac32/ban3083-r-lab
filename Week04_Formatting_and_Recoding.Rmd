@@ -1,0 +1,255 @@
+---
+title: "BAN 3083 - Week 4: Formatting & Re-coding Variables"
+author: "Student Name: [Type Your Name Here]"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+if (!dir.exists("data")) dir.create("data")
+if (!file.exists("data/chinook.sqlite")) {
+  download.file(
+    url = "https://github.com/lerocha/chinook-database/releases/download/v1.4.5/Chinook_Sqlite.sqlite",
+    destfile = "data/chinook.sqlite",
+    mode = "wb"
+  )
+}
+```
+
+## Overview: Formatting & Re-coding Variables in Business Analytics
+
+Raw database variables are rarely ready for executive tables or statistical charts. In **BAN 3083**, formatting and re-coding variables bridges concepts you may have seen in **SQL (`CASE WHEN`)** or **SAS (`PROC FORMAT` / `IF-THEN-ELSE`)** into R:
+
+| Data Management Task | SQL / SAS Equivalent | R (`tidyverse`) Function |
+| :--- | :--- | :--- |
+| Binary recoding (2 outcomes) | `IF ... THEN ... ELSE` | `if_else()` |
+| Multi-tier recoding / bucketing | `CASE WHEN` / `PROC FORMAT` | `case_when()` |
+| Ordering categorical levels | `PROC FORMAT` / `ORDER=DATA` | `forcats::fct_relevel()` & `fct_reorder()` |
+| Cleaning & standardizing text | `UPCASE()`, `TRIM()`, `SUBSTR()` | `stringr::str_trim()`, `str_to_title()` |
+| Parsing dates & day-of-week | `DATEPART()`, `WEEKDAY()` | `lubridate::ymd_hms()`, `wday()`, `month()` |
+
+---
+
+## Part 1: Re-coding Continuous Variables into Business Tiers (`case_when` + `forcats`)
+
+Let's connect to `chinook.sqlite` and load `Track`, `Invoice`, and `Customer`:
+
+```{r load-customer-spending}
+library(tidyverse)
+library(DBI)
+library(RSQLite)
+library(lubridate)
+library(janitor)
+library(gt)
+library(scales)
+
+con <- dbConnect(RSQLite::SQLite(), "data/chinook.sqlite")
+tracks    <- dbReadTable(con, "Track")    |> as_tibble()
+invoices  <- dbReadTable(con, "Invoice")  |> as_tibble()
+customers <- dbReadTable(con, "Customer") |> as_tibble()
+dbDisconnect(con)
+```
+
+Suppose Marketing wants every Chinook invoice classified into **Order Size Tiers**. If we just use text labels, R sorts categories **alphabetically** (putting `"Premium"` before `"Small"` and `"Standard"`!). To fix this, we format the recoded column as an **Ordered Factor** using `fct_relevel()`:
+
+```{r recode-invoices}
+invoices_recoded <- invoices |>
+  mutate(
+    # 1. Binary recode with if_else(): Domestic (USA) vs. International
+    Market_Type = if_else(BillingCountry == "USA", "Domestic (USA)", "International"),
+
+    # 2. Multi-level recode with case_when() (like SQL CASE WHEN / SAS PROC FORMAT)
+    Order_Tier = case_when(
+      Total < 3.00   ~ "Small Order (< $3)",
+      Total <= 10.00 ~ "Standard Order ($3 - $10)",
+      Total > 10.00  ~ "Premium Order (> $10)"
+    ),
+
+    # 3. Lock in logical business ordering (Small -> Standard -> Premium)
+    Order_Tier = fct_relevel(
+      Order_Tier,
+      "Small Order (< $3)",
+      "Standard Order ($3 - $10)",
+      "Premium Order (> $10)"
+    )
+  )
+```
+
+### Displaying Recoded Variables in a Cross-Tabulated Table (`tabyl`)
+Let's inspect the distribution of our newly recoded `Order_Tier` across `Market_Type`:
+
+```{r tabyl-order-tiers}
+invoices_recoded |>
+  tabyl(Order_Tier, Market_Type) |>
+  adorn_totals(c("row", "col")) |>
+  adorn_percentages("col") |>
+  adorn_pct_formatting(digits = 1) |>
+  adorn_ns() |>
+  gt() |>
+  tab_header(
+    title = "Invoice Order Size Tiers: Domestic vs. International",
+    subtitle = "Recoded via if_else(), case_when(), and ordered via fct_relevel()"
+  )
+```
+
+### Plotting Recoded Factors (`ggplot2`)
+Notice on the x-axis below how `Order_Tier` appears in **exact business order** (`Small` $\rightarrow$ `Standard` $\rightarrow$ `Premium`) rather than alphabetical order!
+
+```{r plot-order-tiers}
+ggplot(invoices_recoded, aes(x = Order_Tier, fill = Market_Type)) +
+  geom_bar(position = "dodge", width = 0.7) +
+  scale_fill_manual(values = c("Domestic (USA)" = "#1b9e77", "International" = "#d95f02")) +
+  labs(
+    title = "Distribution of Chinook Invoices by Order Size Tier",
+    subtitle = "Factor levels ordered logically with forcats::fct_relevel()",
+    x = "Recoded Order Size Tier",
+    y = "Number of Invoices",
+    fill = "Market Segment"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## Part 2: String Formatting & Text Standardization (`stringr`)
+
+Real-world customer databases often have inconsistent capitalization, extra spaces, or email domains we want to extract for B2B vs. B2C segmentation. Let's use `stringr` functions on the Chinook `customers` table:
+
+```{r stringr-cleaning}
+customers_formatted <- customers |>
+  mutate(
+    # Combine and format full name in Title Case
+    Full_Name = str_to_title(paste(str_trim(FirstName), str_trim(LastName))),
+
+    # Extract the email provider domain (everything after the '@' symbol)
+    Email_Domain = str_extract(Email, "(?<=@).+"),
+
+    # Recode Corporate vs. Consumer Customer based on whether Company is missing
+    Account_Category = if_else(is.na(Company) | Company == "", "Individual Consumer (B2C)", "Corporate Account (B2B)")
+  )
+
+# Display the B2B/B2C breakdown in a formatted table
+customers_formatted |>
+  count(Account_Category, sort = TRUE) |>
+  mutate(Share = n / sum(n)) |>
+  gt() |>
+  tab_header(title = "Chinook Customer Base: Corporate (B2B) vs. Consumer (B2C)") |>
+  fmt_percent(columns = Share, decimals = 1)
+```
+
+---
+
+## Part 3: Date Formatting & Seasonality Extraction (`lubridate`)
+
+In SQLite, `InvoiceDate` is stored as a plain text string (`"2009-01-01 00:00:00"`). Using **`lubridate`**, we can parse text strings into true Date objects and extract the **Year**, **Month Name**, and **Quarter** to visualize sales seasonality:
+
+```{r lubridate-formatting}
+invoices_dated <- invoices_recoded |>
+  mutate(
+    # Parse text timestamp into a Date-Time object
+    Invoice_Date = ymd_hms(InvoiceDate),
+    Invoice_Year = year(Invoice_Date),
+    # Extract ordered Month abbreviation (Jan, Feb, Mar, ..., Dec)
+    Invoice_Month = month(Invoice_Date, label = TRUE, abbr = TRUE),
+    # Extract Fiscal Quarter (Q1, Q2, Q3, Q4)
+    Fiscal_Quarter = paste0("Q", quarter(Invoice_Date))
+  )
+
+# Summarize revenue by Month and Fiscal Quarter
+monthly_seasonality <- invoices_dated |>
+  group_by(Invoice_Month, Fiscal_Quarter) |>
+  summarize(
+    Invoice_Count = n(),
+    Total_Revenue = sum(Total),
+    .groups = "drop"
+  )
+```
+
+### Displaying Monthly Seasonality with a Plot (`ggplot2`)
+
+```{r plot-monthly-seasonality}
+ggplot(monthly_seasonality, aes(x = Invoice_Month, y = Total_Revenue, fill = Fiscal_Quarter)) +
+  geom_col(width = 0.75) +
+  scale_y_continuous(labels = label_dollar()) +
+  scale_fill_brewer(palette = "Paired") +
+  labs(
+    title = "Chinook Cumulative Revenue by Calendar Month",
+    subtitle = "Month labels & quarters extracted from raw timestamps via lubridate::month() and quarter()",
+    x = "Month of Year",
+    y = "Total Revenue (USD)",
+    fill = "Fiscal Quarter"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## Part 4: Your Turn! Recoding & Visualizing Track Lengths
+
+Run and inspect the code below, which converts `Milliseconds` into `Minutes` in the Chinook `Track` table, recodes tracks into **4 Song Length Categories**, displays a formatted `gt` summary table, and plots the file size breakdown!
+
+```{r exercise-track-recode}
+tracks_recoded <- tracks |>
+  mutate(
+    Minutes = Milliseconds / 60000,
+    Megabytes = Bytes / (1024^2),
+    Length_Category = case_when(
+      Minutes < 2.5  ~ "1. Short Track (< 2.5 min)",
+      Minutes <= 4.5 ~ "2. Standard Radio (2.5 - 4.5 min)",
+      Minutes <= 8.0 ~ "3. Extended Track (4.5 - 8 min)",
+      TRUE           ~ "4. Long-Form / Video (> 8 min)"
+    )
+  )
+
+# 1. Display Formatted Summary Table
+tracks_recoded |>
+  group_by(Length_Category) |>
+  summarize(
+    Track_Count = n(),
+    Avg_Minutes = mean(Minutes),
+    Avg_Megabytes = mean(Megabytes),
+    Avg_Price = mean(UnitPrice)
+  ) |>
+  gt() |>
+  tab_header(title = "Chinook Catalog Breakdown by Recoded Song Duration") |>
+  fmt_number(columns = c(Avg_Minutes, Avg_Megabytes), decimals = 2) |>
+  fmt_currency(columns = Avg_Price, currency = "USD")
+```
+
+```{r exercise-track-plot}
+# 2. Display Boxplot of File Size (MB) across Recoded Length Categories
+tracks_recoded |>
+  filter(Megabytes < 50) |>
+  ggplot(aes(x = Length_Category, y = Megabytes, fill = Length_Category)) +
+  geom_boxplot(alpha = 0.8, outlier.alpha = 0.2) +
+  coord_flip() +
+  scale_fill_viridis_d(option = "mako", guide = "none") +
+  labs(
+    title = "File Size (MB) Distribution Across Recoded Track Length Categories",
+    x = "Recoded Track Duration Tier",
+    y = "File Size (Megabytes)"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+## 🌐 How to Publish to RPubs & Submit Your URL on Canvas
+
+1. At the top of this file (Line 3), replace `[Type Your Name Here]` with your name.
+2. Click **🧶 Knit**, then click the blue **Publish** button $\rightarrow$ **RPubs**.
+3. Submit your `https://rpubs.com/...` URL on **Canvas**!
+
+```{r rpubs-backup, eval=FALSE}
+rsconnect::rpubsUpload(
+  title = "BAN 3083: Week 4 Formatting & Recoding Variables",
+  contentFile = "Week04_Formatting_and_Recoding.html",
+  originalDoc = "Week04_Formatting_and_Recoding.Rmd"
+)$continueUrl
+```
