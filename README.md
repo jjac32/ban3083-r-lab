@@ -2,13 +2,13 @@
 
 Welcome! Click the badge below to launch our **4-pane RStudio IDE** directly in your web browser—no installation or login required:
 
-<p style="margin: 20px 0;">
-  <a class="btn btn-primary btn-large"
-     style="background-color: #2b5c8f; color: #ffffff; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 6px; text-decoration: none; display: inline-block;"
-     href="https://mybinder.org/v2/gh/jjac32/ban3083-r-lab/HEAD?urlpath=rstudio"
+<p>
+  <a href="https://mybinder.org/v2/gh/jjac32/ban3083-r-lab/HEAD?urlpath=rstudio"
      target="_blank"
      rel="noopener noreferrer">
-    🚀 Launch BAN 3083 RStudio Workspace 
+    <img src="https://img.shields.io/badge/Launch_BAN_3083_RStudio-Open_in_Browser-2b5c8f?style=for-the-badge&logo=rstudio&logoColor=white"
+         alt="Launch BAN 3083 RStudio"
+         height="44" />
   </a>
 </p>
 
