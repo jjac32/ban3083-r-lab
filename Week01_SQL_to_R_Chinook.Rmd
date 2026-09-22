@@ -222,25 +222,30 @@ dbDisconnect(con)
 
 ## 🌐 How to Publish to RPubs & Submit Your URL on Canvas
 
-Instead of downloading files, you will publish your finished report to **[RPubs.com](https://rpubs.com/)** and submit your public web link on Canvas!
+Follow these steps to publish your finished lab report to **[RPubs.com](https://rpubs.com/)** and get your submission link for Canvas:
 
-### Step 1: Knit & Publish
-1. At the top of this file (Line 3), replace `[Type Your Name Here]` with your name.
-2. Click the **🧶 Knit** button at the top of this pane. Your formatted HTML report will open in a preview window.
-3. In the top-right corner of that preview window (or the top-right of this editor pane), click the blue **Publish** button (the blue eye/circle icon) $\rightarrow$ choose **RPubs**.
-4. A browser tab will open on **RPubs.com**:
-   - Sign in (or create a free RPubs account if this is your first lab).
-   - Give your report a title (e.g., `Stats 101 - Week 1 Chinook Lab`) and click **Continue**.
-5. Copy the URL from your browser address bar (it will look like `https://rpubs.com/your_username/1234567`) and **paste that URL into the Canvas assignment submission box!**
+1. **Add Your Name**: At the very top of this file (Line 3), replace `[Type Your Name Here]` with your actual name and save (`Ctrl+S` / `Cmd+S`).
+2. **Click the Green `▶` Play Button on the Code Chunk Below**:
+   - It will automatically knit your report to HTML, upload it to **RPubs.com**, and print a **`http://rpubs.com/publish/claim/...`** link right below the box!
+3. **Click That Link**:
+   - It will open **RPubs.com** in a new tab (sign in or create a free account if this is your first lab, then click **Continue**).
+   - Copy your final `https://rpubs.com/your_username/...` URL from your browser's address bar and paste it into **Canvas**!
 
-> 💡 **Popup Blocker Backup:** If your browser blocks the Publish popup window, just run the code chunk below after clicking **Knit**—it will print a direct clickable link in the Console to finish publishing your report to RPubs!
+```{r publish-to-rpubs, eval=FALSE}
+# 👉 CLICK THE GREEN '▶' PLAY BUTTON ON THE RIGHT OF THIS BOX TO PUBLISH!
 
-```{r rpubs-backup, eval=FALSE}
-# Only run this if the blue "Publish -> RPubs" button was blocked by your browser:
+# Step 1: Automatically knit your latest work into an HTML report
+rmarkdown::render("Week01_SQL_to_R_Chinook.Rmd", quiet = TRUE)
+
+# Step 2: Upload the HTML report directly to RPubs.com
 upload_result <- rsconnect::rpubsUpload(
-  title = "Stats 101: Week 1 SQL to R (Chinook)",
+  title = "BAN 3083: Week 1 SQL to R (Chinook)",
   contentFile = "Week01_SQL_to_R_Chinook.html",
   originalDoc = "Week01_SQL_to_R_Chinook.Rmd"
 )
-upload_result$continueUrl
+
+cat("\n============================================================\n")
+cat("🚀 SUCCESS! CLICK THE LINK BELOW TO CLAIM YOUR RPUBS PAGE:\n")
+cat(upload_result$continueUrl, "\n")
+cat("============================================================\n")
 ```
