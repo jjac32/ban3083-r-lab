@@ -48,6 +48,18 @@ raw_pipe_lines <- c(
   "SHP-5006|Louisville|UPS|95|1120.25|3"
 )
 writeLines(raw_pipe_lines, "data/vendor_shipments_pipe.txt")
+
+# 3. Also auto-generate branch_audit.csv (from Lecture 2 Slide 5) so students can test slide code too!
+branch_audit_lines <- c(
+  "CONFIDENTIAL - FY2025 AUDIT",
+  "Generated: 2025-09-01",
+  "Branch #,Region,Gross Rev ($),Defect %,Status",
+  "B-101,West,\"$142,500.50\",2.1%,PASS",
+  "B-102,East,N/A,4.8%,REVIEW",
+  "B-103,South,\"$89,100.00\",-999,PASS"
+)
+writeLines(branch_audit_lines, "branch_audit.csv")
+writeLines(branch_audit_lines, "data/branch_audit.csv")
 ```
 
 ## Overview: Why Reading Raw Data Matters in Business Analytics
