@@ -6,7 +6,8 @@ setHook("rstudio.sessionInit", function(newSession) {
       "Week04_Formatting_and_Recoding.Rmd",
       "Week03_Restructuring_and_Combining.Rmd",
       "Week02_Reading_Raw_Data.Rmd",
-      "Week01_SQL_to_R_Chinook.Rmd"
+      "Week01_SQL_to_R_Chinook.Rmd",
+      "Project_Northwind.Rmd
     )
     for (lab in labs) {
       if (file.exists(lab)) {
