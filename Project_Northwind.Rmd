@@ -46,7 +46,7 @@ In [jpwhite3/northwind-SQLite3](https://github.com/jpwhite3/northwind-SQLite3/tr
 
  - In raw SQL (`dbGetQuery()` or `{sql connection=con}` chunks), wrap it in double quotes or brackets:
 
-```
+```{r}
 dbGetQuery(con, '
   SELECT o.OrderID, o.OrderDate, od.ProductID, od.UnitPrice, od.Quantity, od.Discount
   FROM Orders AS o
@@ -57,7 +57,7 @@ dbGetQuery(con, '
 
  - In `dbplyr`, `tbl()` quotes it automatically:
 
-```
+```{r}
 orders_tbl        <- tbl(con, "Orders")
 order_details_tbl <- tbl(con, "Order Details")
 
