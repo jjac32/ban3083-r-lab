@@ -1,4 +1,5 @@
 #!/bin/bash
 set -e
 mkdir -p data
-curl -L -s "https://github.com/lerocha/chinook-database/releases/download/v1.4.5/Chinook_Sqlite.sqlite" -o data/chinook.sqlite
+curl -fLsS "https://github.com/lerocha/chinook-database/releases/download/v1.4.5/Chinook_Sqlite.sqlite" -o data/chinook.sqlite
+curl -fLsS "https://raw.githubusercontent.com/jpwhite3/northwind-SQLite3/main/dist/northwind.db" -o data/northwind.db
